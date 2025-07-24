@@ -61,47 +61,33 @@ def optimize_gamma_hat(y_v, d_v, mu_k, Sigma_inv, Z, k):
     return gamma.detach()
 
 
-def custom_hessian(y, x, v):
-    grad_y = torch.autograd.grad(y, x, create_graph=True, retain_graph=True)[0]
-    hvp = torch.autograd.grad(grad_y, x, grad_outputs=v, retain_graph=True)[0]
-    return hvp
+def is_indefinite(H):
+    eigvals = torch.linalg.eigvalsh(H)  # For symmetric matrices
+    has_pos = torch.any(eigvals > 0)
+    has_neg = torch.any(eigvals < 0)
+    return has_pos and has_neg
 
 
 def compute_laplace_term(y_v, d_v, mu_k, Sigma_inv, Z, k):
     """
     Computes the Laplace approximation of the marginal
     """
-    time_tmp = time.time()
     # laplace approximation term for one v,k
     gamma_hat = optimize_gamma_hat(y_v, d_v, mu_k, Sigma_inv, Z, k)
-    # print(f"Time required to optimize gamma = {time.time() - time_tmp}")
-    
+
     # hessian of negative log joint at gamma_hat
     def loss_fn(gamma):
         return negative_joint(gamma, y_v, d_v, mu_k, Sigma_inv, Z, k)
 
-    # print(f"gamma_hat shape = {gamma_hat.shape}")
-    
-    time_tmp = time.time()
     H = hessian(loss_fn, gamma_hat, vectorize=True)
-    # print(f"Time required to compute the Hessian matrix = {time.time() - time_tmp}")
-    
-    time_tmp = time.time()
     H_det_log = torch.logdet(H + 1e-6 * torch.eye(H.shape[0], device=H.device))
-    # print(f"Time required to compute the log determinant of H = {time.time() - time_tmp}")
 
-    time_tmp = time.time()
     ll = log_likelihood_gamma(gamma_hat, y_v, d_v, Z, k)
-    # print(f"Time required to compute the loglikelihood = {time.time() - time_tmp}")
-    
-    time_tmp = time.time()
     lp = log_prior_gamma(gamma_hat, mu_k, Sigma_inv)
-    # print(f"Time required to compute the log prior = {time.time() - time_tmp}\n")
-
-    # print(f"Devices\ngamma_hat = {gamma_hat.device}\nH = {H.device}\nH_det_log = {H_det_log.device}\nll = {ll.device}\nlp = {lp.device}")
 
     N = Sigma_inv.shape[0]
     return ll + lp - 0.5 * H_det_log + N/2 * torch.log(torch.tensor(2*torch.pi)), gamma_hat
+
 
 def compute_linkage(gene_expression):
     """
@@ -123,6 +109,7 @@ def compute_linkage(gene_expression):
     distance_matrix = 1 - correlation_matrix
     condensed_dist = squareform(distance_matrix, checks=False)
     return linkage(condensed_dist, method="complete")
+
 
 def compute_ou_kernel(edges, clone_labels, lambd=1.0, sigma_squared=1.0):
     """
