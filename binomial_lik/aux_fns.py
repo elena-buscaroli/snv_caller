@@ -16,14 +16,20 @@ def log_binomial_coefficient(D, Y):
     return torch.lgamma(D + 1) - torch.lgamma(Y + 1) - torch.lgamma(D - Y + 1)
 
 
-def log_likelihood_gamma(gamma, y_v, d_v, Z, k):
+def log_likelihood_gamma(gamma, y_v, d_v, Z):
     """
     Log likelihood -> log p(y_v^k | gamma)
     """
     probs = torch.sigmoid(gamma)  # compute theta -> prob of success
-    log_coeff = log_binomial_coefficient(d_v, y_v)
-    cell_idxs = torch.where(Z == k)[0]  # idxs of cells with cellid == k
-    return torch.sum((log_coeff + y_v * torch.log(probs) + (d_v - y_v) * torch.log(1 - probs))[cell_idxs])
+    ll = 0
+    for k in np.unique(Z.to("cpu")):
+        cell_idxs = torch.where(Z == k)[0]  # idxs of cells with cellid == k
+        y_vk, d_vk = y_v[cell_idxs], d_v[cell_idxs]
+        probs_vk = probs[cell_idxs]
+        log_coeff = log_binomial_coefficient(d_vk, y_vk)
+        ll += torch.sum(log_coeff + y_vk * torch.log(probs_vk) + (d_vk - y_vk) * torch.log(1 - probs_vk))
+
+    return ll
 
 
 def log_prior_gamma(gamma, mu_k, Sigma_inv):
@@ -35,15 +41,15 @@ def log_prior_gamma(gamma, mu_k, Sigma_inv):
     return -0.5 * diff.permute(*torch.arange(diff.ndim - 1, -1, -1)) @ Sigma_inv @ diff
 
 
-def negative_joint(gamma, y_vk, d_vk, mu_k, Sigma_inv, Z, k):
+def negative_joint(gamma, y_vk, d_vk, mu_k, Sigma_inv, Z):
     """
     Computes the negative log joint -> -log p(y | gamma) - log p(gamma | mu, Sigma) \\
     -> negative joint = - p(y | gamma) * p(gamma | mu, Sigma)
     """
-    return -( log_likelihood_gamma(gamma, y_vk, d_vk, Z, k) + log_prior_gamma(gamma, mu_k, Sigma_inv) )
+    return -( log_likelihood_gamma(gamma, y_vk, d_vk, Z) + log_prior_gamma(gamma, mu_k, Sigma_inv) )
 
 
-def optimize_gamma_hat(y_v, d_v, mu_k, Sigma_inv, Z, k):
+def optimize_gamma_hat(y_v, d_v, mu_k, Sigma_inv, Z):
     """
     Computes the mode of gamma_vk
     """
@@ -53,7 +59,7 @@ def optimize_gamma_hat(y_v, d_v, mu_k, Sigma_inv, Z, k):
 
     def gamma_hat():
         inner_opt.zero_grad()
-        loss = negative_joint(gamma, y_v, d_v, mu_k, Sigma_inv, Z, k)
+        loss = negative_joint(gamma, y_v, d_v, mu_k, Sigma_inv, Z)
         loss.backward()
         return loss
 
@@ -68,21 +74,21 @@ def is_indefinite(H):
     return has_pos and has_neg
 
 
-def compute_laplace_term(y_v, d_v, mu_k, Sigma_inv, Z, k):
+def compute_laplace_term(y_v, d_v, mu_k, Sigma_inv, Z):
     """
     Computes the Laplace approximation of the marginal
     """
-    # laplace approximation term for one v,k
-    gamma_hat = optimize_gamma_hat(y_v, d_v, mu_k, Sigma_inv, Z, k)
+    # laplace approximation term for one v
+    gamma_hat = optimize_gamma_hat(y_v, d_v, mu_k, Sigma_inv, Z)
 
     # hessian of negative log joint at gamma_hat
     def loss_fn(gamma):
-        return negative_joint(gamma, y_v, d_v, mu_k, Sigma_inv, Z, k)
+        return negative_joint(gamma, y_v, d_v, mu_k, Sigma_inv, Z)
 
     H = hessian(loss_fn, gamma_hat, vectorize=True)
     H_det_log = torch.logdet(H + 1e-6 * torch.eye(H.shape[0], device=H.device))
 
-    ll = log_likelihood_gamma(gamma_hat, y_v, d_v, Z, k)
+    ll = log_likelihood_gamma(gamma_hat, y_v, d_v, Z)
     lp = log_prior_gamma(gamma_hat, mu_k, Sigma_inv)
 
     N = Sigma_inv.shape[0]
