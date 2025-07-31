@@ -49,22 +49,20 @@ def negative_joint(gamma, y_vk, d_vk, mu, Sigma_inv):
     return -( log_likelihood_gamma(gamma, y_vk, d_vk) + log_prior_gamma(gamma, mu, Sigma_inv) )
 
 
-def optimize_gamma_hat(y_v, d_v, mu, Sigma_inv, gamma):
+def optimize_gamma_hat(y_v, d_v, mu, Sigma_inv, gamma, n_steps=5, lr=1e-2):
     """
     Computes the mode of gamma_vk
     """
-    gamma = nn.Parameter(gamma)
-    # inner_opt = optim.LBFGS([gamma], max_iter=10) # try first order optimizer
-    inner_opt = optim.Adam([gamma], lr=1e-2) # try first order optimizer
+    gamma_par = nn.Parameter(gamma.clone().requires_grad_(True))
+    optimizer = optim.Adam([gamma_par], lr=lr)
 
-    def gamma_hat():
-        inner_opt.zero_grad()
-        loss = negative_joint(gamma, y_v, d_v, mu, Sigma_inv)
+    for _ in range(n_steps):
+        optimizer.zero_grad()
+        loss = negative_joint(gamma_par, y_v, d_v, mu, Sigma_inv)
         loss.backward()
-        return loss
-    inner_opt.step(gamma_hat)
+        optimizer.step()
 
-    return gamma.detach()
+    return gamma_par.detach()
 
 
 def is_indefinite(H):
@@ -186,3 +184,8 @@ def compute_ou_kernel(edges, clone_labels, lambd=1.0, sigma_squared=1.0):
             kernel[i, j] = sigma_squared * np.exp(-lambd * dist)
 
     return kernel
+
+
+def logit_clipped(x, eps=1e-7):
+    x = torch.clamp(x, eps, 1.0 - eps)
+    return torch.logit(x)
