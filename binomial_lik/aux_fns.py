@@ -3,10 +3,49 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 from torch.autograd.functional import hessian
 from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import linkage, dendrogram
 from collections import defaultdict
+
+
+def set_ggplot_light_theme(base_size=10):
+    plt.style.use("default")
+    plt.rcParams.update({
+        "font.family": "Helvetica",
+        "font.size": base_size,
+
+        "axes.titlesize": base_size + 2,
+        "axes.titleweight": "bold",
+        "axes.labelsize": base_size,
+        "axes.labelweight": "normal",
+        "xtick.labelsize": base_size - 2,
+        "ytick.labelsize": base_size - 2,
+        "legend.fontsize": base_size - 2,
+        "legend.title_fontsize": base_size,
+
+        "axes.facecolor": "white",
+        "figure.facecolor": "white",
+        "axes.edgecolor": "#CCCCCC",
+        "grid.color": "#E5E5E5",
+        "grid.linestyle": "-",
+        "grid.linewidth": 0.8,
+
+        "axes.grid": True,
+        "axes.axisbelow": True,
+
+        "legend.loc": "lower center",
+        "legend.frameon": False,
+
+        "xtick.direction": "out",
+        "ytick.direction": "out",
+
+        "lines.linewidth": 1.5,
+        "patch.edgecolor": "none",
+
+        "savefig.format" : "pdf"
+    })
 
 
 def log_binomial_coefficient(D, Y):
