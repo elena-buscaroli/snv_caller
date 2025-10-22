@@ -4,6 +4,7 @@ import torch.optim as optim
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import seaborn as sns
 from torch.autograd.functional import hessian
 from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import linkage, dendrogram
@@ -46,6 +47,26 @@ def set_ggplot_light_theme(base_size=10):
 
         "savefig.format" : "pdf"
     })
+
+
+def plot_heatmap(table,
+                 col_colors=None, row_colors=None,
+                 linkage_matrix_col=None, linkage_matrix_row=None,
+                 legend_title=None):
+    pl = sns.clustermap(table, 
+                        col_colors=col_colors,
+                        row_colors=row_colors,
+                        col_linkage=linkage_matrix_col, 
+                        row_linkage=linkage_matrix_row,
+                        row_cluster=True,
+                        cmap="Blues", figsize=(8, 6))
+
+    pl.ax_heatmap.set_xticks([])
+    pl.ax_heatmap.set_yticks([])
+    pl.fig.subplots_adjust(right=0.75)
+    pl.ax_cbar.set_position((0.8, .2, .03, .4))
+    pl.ax_cbar.set_title(legend_title, pad=10)
+    return pl
 
 
 def log_binomial_coefficient(D, Y):
