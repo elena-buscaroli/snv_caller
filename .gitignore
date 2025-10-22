@@ -1,4 +1,7 @@
 **.DS_Store
 **__pycache__
-**data/
+data/
 **.ipynb_checkpoints/
+.Rproj.user
+**.sif
+**.sff

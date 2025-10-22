@@ -2,19 +2,23 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import pandas as pd
 import time
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 from torch.autograd.functional import hessian
 from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import linkage, dendrogram
+from scipy.cluster.hierarchy import fcluster, linkage
+from matplotlib.patches import Patch
 from collections import defaultdict
 
 
 def set_ggplot_light_theme(base_size=10):
     plt.style.use("default")
     plt.rcParams.update({
-        "font.family": "Helvetica",
+        # "font.family": "Helvetica",
         "font.size": base_size,
 
         "axes.titlesize": base_size + 2,
@@ -49,10 +53,37 @@ def set_ggplot_light_theme(base_size=10):
     })
 
 
+def plot_dendogram(linkage_matrix, cell_ids, clone_ids, color_map, save_path=None):
+    symbol_labels = ['●'] * len(cell_ids)
+    unique_groups = set(clone_ids)
+    
+    plt.figure(figsize=(8, 6))
+    dendro = dendrogram(linkage_matrix, color_threshold=0, above_threshold_color="grey", labels=symbol_labels, leaf_font_size=10)
+    leaf_order = dendro["leaves"]
+    groupings_ordered = np.array(clone_ids)[leaf_order]
+    
+    ax = plt.gca()
+    xlbls = ax.get_xmajorticklabels()
+    for lbl, group in zip(xlbls, groupings_ordered):
+        lbl.set_color(color_map[group])
+    
+    legend_elements = [Patch(facecolor=color_map[g], label=f'Clone {g}') for g in unique_groups]
+    
+    plt.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.2, 1))
+    plt.title('Dendrogram with group-colored labels', loc="left")
+    plt.ylabel('Distance')
+    plt.xlabel('Cells')
+    plt.grid(visible=False)
+    plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path+"dendogram.pdf", dpi=600)
+    plt.show()
+
+
 def plot_heatmap(table,
                  col_colors=None, row_colors=None,
                  linkage_matrix_col=None, linkage_matrix_row=None,
-                 legend_title=None):
+                 legend_title=None, out_name=None):
     pl = sns.clustermap(table, 
                         col_colors=col_colors,
                         row_colors=row_colors,
@@ -66,7 +97,42 @@ def plot_heatmap(table,
     pl.fig.subplots_adjust(right=0.75)
     pl.ax_cbar.set_position((0.8, .2, .03, .4))
     pl.ax_cbar.set_title(legend_title, pad=10)
+    if out_name is not None:
+        pl.fig.savefig(out_name)
     return pl
+
+
+def assign_clones_from_tree(tree, K, distances_file=None):
+    if distances_file is None:
+        distances_file = "distances.csv"
+        tree.phylogenetic_distance_matrix().as_data_table().write_csv(distances_file)
+    distances_df = pd.read_csv(distances_file, index_col=0)
+    cell_ids = list(distances_df.index)
+
+    distances = squareform(np.array(distances_df.values), checks=False)    
+    linkage_matrix = linkage(distances, method="complete")
+    clone_ids = fcluster(linkage_matrix, K, criterion="maxclust")
+    os.remove("distances.csv")
+    return {cell_id:clone_id for cell_id,clone_id in zip(cell_ids,clone_ids)}, linkage_matrix
+
+
+def tree_to_edge_list(tree):
+    edge_list = []
+    for edge in tree.edges():
+        parent = edge.tail_node  # parent node
+        child = edge.head_node  # child node
+
+        if parent is None:
+            continue
+
+        branch_length = edge.length  # branch length
+
+        parent_label = parent.label or (parent.taxon.label if parent.taxon else None) or str(id(parent))
+        child_label = child.label or (child.taxon.label if child.taxon else None) or str(id(child))
+        
+        edge_list.append([parent_label, child_label, branch_length])
+
+    return edge_list
 
 
 def log_binomial_coefficient(D, Y):
@@ -125,6 +191,17 @@ def optimize_gamma_hat(y_v, d_v, mu, Sigma_inv, gamma, n_steps=5, lr=1e-2):
     return gamma_par.detach()
 
 
+# def optimize_gamma_hat(y_v, d_v, mu, Sigma_inv, gamma, n_steps=5, lr=1e-2):
+#     gamma_hat = gamma.clone().detach().requires_grad_(True)
+    
+#     for _ in range(n_steps):
+#         loss = negative_joint(gamma_hat, y_v, d_v, mu, Sigma_inv)
+#         grad = torch.autograd.grad(loss, gamma_hat, create_graph=False)[0]
+#         gamma_hat = gamma_hat - lr * grad
+    
+#     return gamma_hat.detach()
+
+
 def is_indefinite(H):
     eigvals = torch.linalg.eigvalsh(H)  # For symmetric matrices
     has_pos = torch.any(eigvals > 0)
@@ -140,8 +217,7 @@ def compute_laplace_term(y_v, d_v, mu, Sigma_inv, gamma):
     gamma_hat = optimize_gamma_hat(y_v, d_v, mu, Sigma_inv, gamma)
 
     # hessian of negative log joint at gamma_hat
-    def loss_fn(gamma):
-        return negative_joint(gamma, y_v, d_v, mu, Sigma_inv)
+    def loss_fn(g): return negative_joint(g, y_v, d_v, mu, Sigma_inv)
 
     H = hessian(loss_fn, gamma_hat, vectorize=True)
     H_det_log = torch.logdet(H + 1e-6 * torch.eye(H.shape[0], device=H.device))
@@ -249,3 +325,11 @@ def compute_ou_kernel(edges, clone_labels, lambd=1.0, sigma_squared=1.0):
 def logit_clipped(x, eps=1e-7):
     x = torch.clamp(x, eps, 1.0 - eps)
     return torch.logit(x)
+
+
+def array_to_df(array, value_name, col_names):
+    df = pd.DataFrame(array)
+    df.columns = col_names
+    df["mutation_ids"] = df.index
+    df = pd.melt(df, id_vars=["mutation_ids"], value_vars=col_names, var_name="cell_ids", value_name=value_name)
+    return df
