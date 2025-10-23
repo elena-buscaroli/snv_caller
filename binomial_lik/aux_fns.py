@@ -109,7 +109,7 @@ def assign_clones_from_tree(tree, K, distances_file=None):
     distances_df = pd.read_csv(distances_file, index_col=0)
     cell_ids = list(distances_df.index)
 
-    distances = squareform(np.array(distances_df.values), checks=False)    
+    distances = squareform(np.array(distances_df.values), checks=False)
     linkage_matrix = linkage(distances, method="complete")
     clone_ids = fcluster(linkage_matrix, K, criterion="maxclust")
     os.remove("distances.csv")
@@ -312,8 +312,8 @@ def compute_ou_kernel(edges, clone_labels, lambd=1.0, sigma_squared=1.0):
         for j in range(n):
             node_i = clone_labels[i]
             node_j = clone_labels[j]
-            d_i = node_depth[node_i]
-            d_j = node_depth[node_j]
+            d_i = node_depth[str(node_i)]
+            d_j = node_depth[str(node_j)]
             mrca = find_mrca(node_i, node_j)
             d_mrca = node_depth[mrca]
             dist = d_i + d_j - 2 * d_mrca
