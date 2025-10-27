@@ -102,7 +102,7 @@ def plot_heatmap(table,
     return pl
 
 
-def assign_clones_from_tree(tree, K, distances_file=None):
+def assign_clones_from_tree(tree, K=None, distances_file=None):
     if distances_file is None:
         distances_file = "distances.csv"
         tree.phylogenetic_distance_matrix().as_data_table().write_csv(distances_file)
@@ -111,9 +111,12 @@ def assign_clones_from_tree(tree, K, distances_file=None):
 
     distances = squareform(np.array(distances_df.values), checks=False)
     linkage_matrix = linkage(distances, method="complete")
-    clone_ids = fcluster(linkage_matrix, K, criterion="maxclust")
     os.remove("distances.csv")
-    return {cell_id:clone_id for cell_id,clone_id in zip(cell_ids,clone_ids)}, linkage_matrix
+    if K is not None:
+        clone_ids = fcluster(linkage_matrix, K, criterion="maxclust")
+        return {cell_id:clone_id for cell_id,clone_id in zip(cell_ids,clone_ids)}, linkage_matrix
+    return cell_ids, linkage_matrix
+    
 
 
 def tree_to_edge_list(tree):
