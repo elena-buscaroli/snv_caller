@@ -53,7 +53,7 @@ def set_ggplot_light_theme(base_size=10):
     })
 
 
-def plot_dendogram(linkage_matrix, cell_ids, clone_ids, color_map, save_path=None):
+def plot_dendogram(linkage_matrix, cell_ids, clone_ids, color_map, out_name=None):
     symbol_labels = ['●'] * len(cell_ids)
     unique_groups = set(clone_ids)
     
@@ -75,8 +75,8 @@ def plot_dendogram(linkage_matrix, cell_ids, clone_ids, color_map, save_path=Non
     plt.xlabel('Cells')
     plt.grid(visible=False)
     plt.tight_layout()
-    if save_path is not None:
-        plt.savefig(save_path+"dendogram.pdf", dpi=600)
+    if out_name is not None:
+        plt.savefig(out_name, dpi=600)
     plt.show()
 
 

@@ -3,10 +3,10 @@ library(ProCESS)
 library(ape)
 library(tidyverse)
 
-AD_true = readRDS("process_dlp_data/somatic_nv.rds") %>% 
+AD_true = readRDS("process_dlp_data/high_cov_300x/somatic_nv_high_cov.rds") %>% 
   pivot_wider(id_cols="mutationID", names_from="sample", values_from="NV", values_fill=0) %>% 
   column_to_rownames(var="mutationID")
-DP_true = readRDS("process_dlp_data/somatic_dp.rds") %>% 
+DP_true = readRDS("process_dlp_data/high_cov_1500x/somatic_dp_high_cov.rds") %>% 
   pivot_wider(id_cols="mutationID", names_from="sample", values_from="DP", values_fill=0) %>% 
   column_to_rownames(var="mutationID")
 
