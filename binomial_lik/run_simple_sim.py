@@ -120,12 +120,15 @@ if __name__ == "__main__":
 
     edges = tree_to_edge_list(tree)
     kernel = compute_ou_kernel(edges, list(assignments.keys()), lambd=.01, sigma_squared=1.0)
+    pd.DataFrame(kernel).to_csv(out_folder+"kernel.csv")
     assert kernel.shape[0] == kernel.shape[1]
     assert kernel.shape[0] == N
     plot_heatmap(kernel, col_colors=label_colors, row_colors=label_colors,
                  linkage_matrix_col=linkage_matrix, linkage_matrix_row=linkage_matrix,
                  out_name=out_folder+"kernel.pdf")
 
+
+    
     rng = np.random.default_rng(0)
     # 2 clones, 1000 mutations, 500 cells
     
@@ -163,10 +166,14 @@ if __name__ == "__main__":
     mask_mut = (G == 1) & (depths > 0)
     alt_counts[mask_mut] = rng.binomial(depths[mask_mut], 0.5)
 
+    DP_true = mean_depth * np.ones_like(depths)  # o una costante teorica
+    AD_true = 0.5 * DP_true * G                  # se la mutazione è presente: 0.5*DP, altrimenti 0
+    presence = (G == 1).astype(int)              # 1 = dovrebbe esserci, 0 = assente
+    
     DP = pd.DataFrame(depths)
     AD = pd.DataFrame(alt_counts)
-    P_true = 0.5 * (G == 1)
-    AD_true = DP * P_true
+    # P_true = 0.5 * (G == 1)
+    # AD_true = DP * P_true
     theta_t = (AD/DP).fillna(0)
     theta_t[theta_t==0] = 1e-15
     theta_t[theta_t==1] = 1. - 1e-15
@@ -177,6 +184,8 @@ if __name__ == "__main__":
                            array_to_df(AD, "AD", cell_ids)["AD"],
                            array_to_df(DP, "DP", cell_ids)["DP"],
                            array_to_df(AD_true, "AD_true", cell_ids)["AD_true"],
+                           array_to_df(DP_true, "DP_true", cell_ids)["DP_true"],
+                           array_to_df(presence, "presence", cell_ids)["presence"],
                            array_to_df(gamma_t, "gamma", cell_ids)["gamma"]],
                            axis=1, join="inner")
     data_true["clone_ids"] = [str(assignments[i]) for i in data_true["cell_ids"]]
