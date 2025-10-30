@@ -114,8 +114,9 @@ def assign_clones_from_tree(tree, K=None, distances_file=None):
     os.remove("distances.csv")
     if K is not None:
         clone_ids = fcluster(linkage_matrix, K, criterion="maxclust")
-        return {cell_id:clone_id for cell_id,clone_id in zip(cell_ids,clone_ids)}, linkage_matrix
-    return cell_ids, linkage_matrix
+        return {cell_id:clone_id for cell_id,clone_id in zip(cell_ids,clone_ids)}, linkage_matrix, distances_df
+    
+    return cell_ids, linkage_matrix, distances_df
     
 
 

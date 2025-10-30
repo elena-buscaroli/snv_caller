@@ -1,10 +1,12 @@
 library(tidyverse)
 
-data_folder = "process_dlp_data/high_cov_1500x/out/"
+data_folder = "process_dlp_data/high_cov_20x/out/"
 
 mutations = readRDS("process_dlp_data/mutations.rds") %>% as_tibble() %>% 
   mutate(mutationID=paste(chr, from, ref, alt, sep=":")) %>%
   select(cell_id, mutationID, type, cause, class, allele)
+
+readRDS("process_dlp_data/nodes.rds") %>% inner_join(y=muts_sequenced, by="sample")
 
 compute_is.present = function(mutation_ids, cell_ids) {
   tmp = mutations %>% filter(mutationID==mutation_ids, cell_id==cell_ids)
@@ -97,8 +99,9 @@ final_vafs = w_kernel$theta %>% tibble::rownames_to_column("mutation_ids") %>%
 final_vafs %>% 
   left_join(data_true) %>% 
   ggplot() +
-  geom_boxplot(aes(x=factor(VAF_true), y=VAF_inf, color=type), position=position_dodge())
-  # facet_grid(~type)
+  geom_boxplot(aes(x=is.present, y=VAF_inf, color=type), position=position_dodge(), outliers=FALSE) +
+  ggbeeswarm::geom_beeswarm(aes(x=is.present, y=VAF_inf, color=type)) +
+  facet_wrap(~is.present, scales="free")
 
 data_true %>% 
   ggplot() +
@@ -113,7 +116,42 @@ final_vafs %>%
 # facet_grid(~type)
 
 
+input_d = final_vafs %>% 
+  left_join(data_true) %>% 
+  select(mutation_ids, cell_ids, VAF_inf, VAF, type, is.present) %>% 
+  reshape2::melt(id=c("mutation_ids", "cell_ids", "is.present", "type")) %>% as_tibble() %>% 
+  mutate(variable=factor(variable, levels=c("VAF","VAF_inf")))
 
+input_d %>% 
+  
+  # filter(type=="w_kernel", is.present) %>% 
+  
+  ggplot() +
+  # geom_point(aes(x=variable, y=value), size=0.5) +
+  # geom_line(aes(x=variable, y=value, group=interaction(mutation_ids, cell_ids))) +
+  geom_violin(aes(x=variable, y=value), draw_quantiles=c(0.5)) +
+  facet_grid(type ~ is.present)
+
+
+input_d %>% 
+  ggplot() +
+  geom_point(aes(x=VAF, y=VAF_inf), size=1, alpha=0.5) +
+  geom_abline() +
+  facet_grid(type ~ is.present) +
+  theme_bw()
+
+
+input_d %>% filter(!is.present)
+
+data_true %>% filter(!is.present) %>% 
+  filter(VAF > 0.1)
+
+
+input_d %>% 
+  filter(value > 0.001) %>% 
+  ggplot() +
+  geom_density(aes(x=value, fill=variable), position="identity", alpha=.5) +
+  facet_grid(type ~ is.present) + theme_bw()
 
 
 

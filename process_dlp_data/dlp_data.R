@@ -30,7 +30,7 @@ nodes_all = readRDS("process_dlp_data/nodes.rds") %>% as_tibble() %>%
 
 mutations = readRDS("process_dlp_data/mutations.rds") %>% as_tibble() %>% 
   mutate(mutationID=paste(chr, from, ref, alt, sep=":")) %>%
-  select(cell_id, mutationID, type, cause, class, allele)
+  select(cell_id, mutationID, type, cause, class, allele, sample)
 
 get_cell_id = function(mutation_object) {
   tryCatch(
