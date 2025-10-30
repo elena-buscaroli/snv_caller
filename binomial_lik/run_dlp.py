@@ -40,7 +40,7 @@ def model_run(AD, DP, kernel, device="cpu", use_kernel=True, learning_rate = 0.0
     if use_kernel:
         Sigma = torch.tensor(kernel, dtype=torch.float32, device=device) + 1e-6*torch.eye(N, device=device)
     else:
-        Sigma = torch.eye(n=kernel.shape[0])
+        Sigma = torch.eye(n=kernel.shape[0], device=device)
     Sigma_inv = torch.linalg.inv(Sigma)  # inverese of Sigma -> N x N
     log_det_Sigma = torch.logdet(Sigma)  # log of determinant of Sigma
 

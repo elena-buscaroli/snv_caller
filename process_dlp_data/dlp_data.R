@@ -3,17 +3,18 @@ library(ProCESS)
 library(ape)
 library(tidyverse)
 
-AD_true = readRDS("process_dlp_data/high_cov_300x/somatic_nv_high_cov.rds") %>% 
+data_path = "process_dlp_data/high_cov_1500x/"
+
+AD_true = readRDS(file.path(data_path, "somatic_nv.rds")) %>% 
   pivot_wider(id_cols="mutationID", names_from="sample", values_from="NV", values_fill=0) %>% 
   column_to_rownames(var="mutationID")
-DP_true = readRDS("process_dlp_data/high_cov_1500x/somatic_dp_high_cov.rds") %>% 
+DP_true = readRDS(file.path(data_path, "somatic_dp.rds")) %>% 
   pivot_wider(id_cols="mutationID", names_from="sample", values_from="DP", values_fill=0) %>% 
   column_to_rownames(var="mutationID")
 
-# write.csv(AD_true, "process_dlp_data/AD_true.csv")
-# write.csv(DP_true, "process_dlp_data/DP_true.csv")
+write.csv(AD_true, file.path(data_path, "AD_true.csv"))
+write.csv(DP_true, file.path(data_path, "DP_true.csv"))
 
-heatmap(as.matrix(AD_true[1:100,]))
 
 # sample_forest = load_sample_forest("process_dlp_data/sample_forest_1.sff")
 # phylo_forest = load_phylogenetic_forest("process_dlp_data/phylo_forest_1.sff")
@@ -23,21 +24,51 @@ heatmap(as.matrix(AD_true[1:100,]))
 # saveRDS(nodes, "process_dlp_data/nodes.rds")
 # saveRDS(mutations, "process_dlp_data/mutations.rds")
 
+
 nodes_all = readRDS("process_dlp_data/nodes.rds") %>% as_tibble() %>% 
   mutate(ancestor=replace(ancestor, is.na(ancestor), "root"))
+
 mutations = readRDS("process_dlp_data/mutations.rds") %>% as_tibble() %>% 
-  mutate(mutationID=paste(chr, from, ref, alt, sep=":")) %>% 
+  mutate(mutationID=paste(chr, from, ref, alt, sep=":")) %>%
   select(cell_id, mutationID, type, cause, class, allele)
 
-nodes = nodes_all %>%
-  mutate(ancestor=as.character(ancestor),
-         cell_id=as.character(cell_id))
+get_cell_id = function(mutation_object) {
+  tryCatch(
+    expr = { phylo_forest$get_first_occurrences(mutation_object)[[1]] },
+    error = function(e) return(NA)
+  )
+}
 
-edges = nodes %>%
-  left_join(nodes %>% select(ancestor=cell_id, ancestor_birth=birth_time),
-            by="ancestor") %>%
-  mutate(weight=ifelse(is.na(birth_time - ancestor_birth), 0, birth_time - ancestor_birth))
+mut_process_with_clusterid = mutations %>% 
+  filter(class != "germinal") %>%
+  rowwise() %>%
+  mutate(cell_id=get_cell_id(Mutation(chr, chr_pos, ref, alt))) %>%
+  ungroup() %>% 
+  left_join(relevant_branches) %>% 
+  ungroup() %>%
+  select(cell_id, mutation_id, causes, is_driver_process, label, contains(".VAF")) %>%
+  pivot_longer(
+    cols=ends_with(".VAF"),
+    names_to="sample_id",
+    names_pattern="(.*)\\.VAF", # remove matching text "VAF" from the start of each variable name
+    values_to="vaf_process" # this is the VAF!
+  ) %>%
+  rename(cluster_id_process=label)
 
+
+# nodes_all = readRDS("process_dlp_data/nodes.rds") %>% as_tibble() %>% 
+#   mutate(ancestor=replace(ancestor, is.na(ancestor), "root"))
+# mutations = readRDS("process_dlp_data/mutations.rds") %>% as_tibble() %>% 
+#   mutate(mutationID=paste(chr, from, ref, alt, sep=":")) %>% 
+#   select(cell_id, mutationID, type, cause, class, allele)
+# 
+# nodes = nodes_all %>%
+#   mutate(ancestor=as.character(ancestor),
+#          cell_id=as.character(cell_id))
+# edges = nodes %>%
+#   left_join(nodes %>% select(ancestor=cell_id, ancestor_birth=birth_time),
+#             by="ancestor") %>%
+#   mutate(weight=ifelse(is.na(birth_time - ancestor_birth), 0, birth_time - ancestor_birth))
 
 
 # library(igraph)
