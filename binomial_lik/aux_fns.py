@@ -1,18 +1,16 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
+import os
+from collections import defaultdict
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import time
-import matplotlib.pyplot as plt
 import seaborn as sns
-import os
-from torch.autograd.functional import hessian
-from scipy.spatial.distance import squareform
-from scipy.cluster.hierarchy import linkage, dendrogram
-from scipy.cluster.hierarchy import fcluster, linkage
+import torch
 from matplotlib.patches import Patch
-from collections import defaultdict
+from scipy.cluster.hierarchy import dendrogram, fcluster, linkage
+from scipy.spatial.distance import squareform
+from torch import nn, optim
+from torch.autograd.functional import hessian
 
 
 def set_ggplot_light_theme(base_size=10):
@@ -49,7 +47,7 @@ def set_ggplot_light_theme(base_size=10):
         "lines.linewidth": 1.5,
         "patch.edgecolor": "none",
 
-        "savefig.format" : "pdf"
+        "savefig.format" : "png"
     })
 
 
@@ -76,7 +74,7 @@ def plot_dendogram(linkage_matrix, cell_ids, clone_ids, color_map, out_name=None
     plt.grid(visible=False)
     plt.tight_layout()
     if out_name is not None:
-        plt.savefig(out_name, dpi=600)
+        plt.savefig(out_name, transparent=True, dpi=500)
     plt.show()
 
 
@@ -98,7 +96,7 @@ def plot_heatmap(table,
     pl.ax_cbar.set_position((0.8, .2, .03, .4))
     pl.ax_cbar.set_title(legend_title, pad=10)
     if out_name is not None:
-        pl.fig.savefig(out_name)
+        pl.savefig(out_name, transparent=True, dpi=500)
     return pl
 
 

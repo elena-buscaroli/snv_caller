@@ -4,17 +4,20 @@ expit = function(x) {
   exp(x) / (1 + exp(x))
 }
 
-
 data_folder = "simple_simulated_data/out/"
 
 data_true = read.csv(file.path(data_folder, "data_true.csv"), row.names=1) %>% as_tibble() %>% 
-  mutate(mutation_ids=paste0("M", mutation_ids))
+  mutate(mutation_ids=paste0("M", mutation_ids)) %>% 
+  mutate(VAF_true=ifelse(AD_true > 0, 0.5, 0)) %>% 
+  mutate(is.present=VAF_true > 0)
 
 mutation_ids = data_true %>% select(mutation_ids, cell_ids, VAF) %>% 
   pivot_wider(names_from="cell_ids", values_from="VAF") %>% pull(mutation_ids)
 cell_ids = data_true %>% select(mutation_ids, cell_ids, VAF) %>% 
   pivot_wider(names_from="cell_ids", values_from="VAF") %>% select(-mutation_ids) %>% 
   colnames
+
+# Losses and gradients ####
 
 losses_grads = read.csv(file.path(data_folder, "losses_kernel.csv")) %>% mutate(type="w_kernel") %>% 
   bind_rows(read.csv(file.path(data_folder, "losses_Nkernel.csv")) %>% mutate(type="wout_kernel")) %>% 
@@ -24,13 +27,16 @@ losses_grads = read.csv(file.path(data_folder, "losses_kernel.csv")) %>% mutate(
       bind_rows(read.csv(file.path(data_folder, "grads_Nkernel.csv")) %>% mutate(type="wout_kernel"))
   )
 
-losses_grads %>% 
+pl_losses = losses_grads %>% 
   ggplot() +
   geom_line(aes(x=X, y=losses, color=type)) + facet_wrap(~type, scales="free")
 
-losses_grads %>% 
+pl_grads = losses_grads %>% 
   ggplot() +
   geom_line(aes(x=X, y=grads, color=type)) + facet_wrap(~type, scales="free")
+
+
+# Matrices #####
 
 load_matrix = function(file_name, row_names, cell_ids) {
   tmp = read.csv(file_name, row.names=1, check.names=F)
@@ -130,13 +136,18 @@ pl_vafs["observed"] = Heatmap(VAF[, hclust_res$labels], name="VAF",
 
 input_d = final_vafs %>% 
   left_join(data_true) %>% 
-  select(mutation_ids, cell_ids, VAF_inf, VAF, type) %>% 
-  reshape2::melt(id=c("mutation_ids", "cell_ids", "type")) %>% as_tibble() %>% 
+  select(mutation_ids, cell_ids, VAF_inf, VAF, type, is.present) %>% 
+  reshape2::melt(id=c("mutation_ids", "cell_ids", "is.present", "type")) %>% as_tibble() %>% 
   mutate(variable=factor(variable, levels=c("VAF","VAF_inf")))
 
 input_d %>% 
+  filter(type=="w_kernel", is.present) %>% 
   ggplot() +
-  geom_line(aes(x=variable, y=value, group=interaction(mutation_ids, cell_ids)))
+  geom_line(aes(x=variable, y=value, group=interaction(mutation_ids, cell_ids))) +
+  facet_grid(type ~ is.present)
+
+
+
 
 
 
